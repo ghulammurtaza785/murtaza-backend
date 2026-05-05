@@ -13,19 +13,20 @@ const blogRoutes      = require('./routes/blogs');
 
 const app = express();
 
-// ── Middleware ────────────────────────────────────────────
+// ── CORS — allow ALL origins (fixes signup/login on any domain) ──
 app.use(cors({
-  origin: [
-    process.env.FRONTEND_URL || 'http://localhost:3000',
-    'https://murtaza-rentacar.vercel.app',
-    /\.vercel\.app$/,
-  ],
+  origin: true,          // allow every origin
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+app.options('*', cors()); // pre-flight for all routes
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// ── Routes ────────────────────────────────────────────────
+// ── Routes ───────────────────────────────────────────────────────
 app.use('/api/auth',       authRoutes);
 app.use('/api/cars',       carRoutes);
 app.use('/api/bookings',   bookingRoutes);
@@ -34,18 +35,17 @@ app.use('/api/complaints', complaintRoutes);
 app.use('/api/admin',      adminRoutes);
 app.use('/api/blogs',      blogRoutes);
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Murtaza Rent A Car API is running' });
-});
+// Health check — test karne ke liye
+app.get('/',          (req, res) => res.json({ status: 'OK', message: 'Murtaza Rent A Car API' }));
+app.get('/api/health',(req, res) => res.json({ status: 'OK', message: 'Murtaza Rent A Car API is running' }));
 
-// ── MongoDB Connection (Railway-compatible) ───────────────
+// ── MongoDB Connection (Railway/Render compatible) ────────────────
 const MONGO_OPTIONS = {
   serverSelectionTimeoutMS: 30000,
   socketTimeoutMS:          45000,
   connectTimeoutMS:         30000,
   maxPoolSize:              10,
-  family:                   4,     // Force IPv4 — fixes Railway DNS/SRV issue
+  family:                   4,   // Force IPv4 — fixes Railway DNS issue
 };
 
 const connectDB = async () => {
@@ -62,14 +62,11 @@ const connectDB = async () => {
     } catch (err) {
       retries--;
       console.error('MongoDB error (' + retries + ' retries left): ' + err.message);
-      if (retries === 0) {
-        process.exit(1);
-      }
+      if (retries === 0) process.exit(1);
       await new Promise(r => setTimeout(r, 5000));
     }
   }
 };
 
 connectDB();
-
 module.exports = app;
